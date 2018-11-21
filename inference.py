@@ -13,6 +13,7 @@
 
 
 import itertools
+import operator
 import util
 import random
 import busters
@@ -473,6 +474,7 @@ class JointParticleFilter:
 
     def __init__(self, numParticles=600):
         self.setNumParticles(numParticles)
+        self.particles = []
 
     def setNumParticles(self, numParticles):
         self.numParticles = numParticles
@@ -507,6 +509,15 @@ class JointParticleFilter:
         """
         "*** YOUR CODE HERE ***"
 
+        self.particles = list(itertools.product(self.legalPositions, repeat=self.numGhosts))
+        # self.particles = [p for p in self.particles if len(set(p)) == len(p)]
+        random.shuffle(self.particles)
+
+        while len(self.particles) < self.numParticles:
+            self.particles += self.particles
+        self.particles = self.particles[:self.numParticles]
+
+
         "*** END YOUR CODE HERE ***"
 
     def addGhostAgent(self, agent):
@@ -517,7 +528,7 @@ class JointParticleFilter:
         self.ghostAgents.append(agent)
 
     def getJailPosition(self, i):
-        return (2 * i + 1, 1);
+        return (2 * i + 1, 1)
 
     def observeState(self, gameState):
         """Resamples the set of particles using the likelihood of the noisy
@@ -573,6 +584,23 @@ class JointParticleFilter:
         emissionModels = [busters.getObservationDistribution(dist) for dist in noisyDistances]
 
         "*** YOUR CODE HERE ***"
+
+        for i in range(self.numGhosts):
+            if noisyDistances[i] is None:
+                self.particles = [self.getParticleWithGhostInJail(p, i) for p in self.particles]
+
+        weights = util.Counter()
+        for i, particle in enumerate(self.particles):
+            priors = [emissionModels[g][util.manhattanDistance(particle[g], pacmanPosition)]
+                      for g in range(self.numGhosts) if noisyDistances[g] is not None]
+            weights[i] = reduce(operator.mul, priors, 1)
+
+        if weights.totalCount() == 0:
+            self.initializeParticles()
+            return
+
+        weights.normalize()
+        self.particles = util.nSample(weights, self.particles, len(self.particles))
 
         "*** END YOUR CODE HERE ***"
 
@@ -635,14 +663,21 @@ class JointParticleFilter:
             # now loop through and update each entry in newParticle...
 
             "*** YOUR CODE HERE ***"
-
+            for i in range(self.numGhosts):
+                p_xt_xtm1 = getPositionDistributionForGhost(
+                    setGhostPositions(gameState, oldParticle), i, self.ghostAgents[i])
+                newParticle[i] = util.sample(p_xt_xtm1, self.legalPositions)
             "*** END YOUR CODE HERE ***"
             newParticles.append(tuple(newParticle))
         self.particles = newParticles
 
     def getBeliefDistribution(self):
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        distribution = util.Counter()
+        for particle in self.particles:
+            distribution[particle] += 1
+        distribution.normalize()
+        return distribution
         "*** END YOUR CODE HERE ***"
 
 
