@@ -590,17 +590,17 @@ class JointParticleFilter:
                 self.particles = [self.getParticleWithGhostInJail(p, i) for p in self.particles]
 
         weights = util.Counter()
-        for i, particle in enumerate(self.particles):
+        for particle in self.particles:
             priors = [emissionModels[g][util.manhattanDistance(particle[g], pacmanPosition)]
                       for g in range(self.numGhosts) if noisyDistances[g] is not None]
-            weights[i] = reduce(operator.mul, priors, 1)
+            weights[particle] += reduce(operator.mul, priors, 1)
 
         if weights.totalCount() == 0:
             self.initializeParticles()
             return
 
         weights.normalize()
-        self.particles = util.nSample(weights, self.particles, len(self.particles))
+        self.particles = [util.sample(weights, self.particles) for _ in self.particles]
 
         "*** END YOUR CODE HERE ***"
 
